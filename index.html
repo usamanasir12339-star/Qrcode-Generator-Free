@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Usama Free QR Code Generator</title>
+<style>
+:root{--bg:#eef2f6;--card:#fff;--text:#12233d;--muted:#5a6a80;--line:#d5dde8;--accent:#0b7a6e;--accent-t:#fff;--field:#f7f9fc;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1523;--card:#16213a;--text:#eaf0fa;--muted:#9fb0c8;--line:#2a3958;--accent:#2fd3bd;--accent-t:#04211d;--field:#0f1a2f}}
+:root[data-theme="dark"]{--bg:#0d1523;--card:#16213a;--text:#eaf0fa;--muted:#9fb0c8;--line:#2a3958;--accent:#2fd3bd;--accent-t:#04211d;--field:#0f1a2f}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.15;margin:8px 0 6px;letter-spacing:-.02em}
+.sub{color:var(--muted);margin:0 0 22px;max-width:52ch}
+.grid{display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:760px){.grid{grid-template-columns:1.1fr .9fr;align-items:start}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+label{display:block;font-weight:600;margin:0 0 6px}
+.hint{font-weight:400;color:var(--muted);font-size:.88rem}
+input[type=text],textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--text);font:inherit}
+textarea{resize:vertical;min-height:84px}
+input:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.field{margin-bottom:16px}
+.row{display:flex;gap:14px}
+.row>div{flex:1}
+input[type=color]{width:100%;height:44px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--field);cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.prev{display:flex;flex-direction:column;align-items:center;gap:14px}
+.box{width:100%;display:flex;justify-content:center;background:repeating-conic-gradient(var(--field) 0 25%,var(--card) 0 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:12px;padding:14px;min-height:200px;align-items:center}
+canvas{max-width:100%;height:auto;display:block;border-radius:4px}
+.empty{color:var(--muted);text-align:center;margin:0}
+button{font:inherit;font-weight:700;padding:13px 18px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-t);cursor:pointer;width:100%}
+button:disabled{opacity:.45;cursor:not-allowed}
+.msg{min-height:1.4em;margin:0;font-size:.92rem;text-align:center;color:var(--muted)}
+.msg.bad{color:#c2410c}
+footer{margin-top:22px;color:var(--muted);font-size:.88rem;text-align:center}
+</style>
+</head>
+<body>
+<main>
+<h1>Usama Free QR Code Generator</h1>
+<p class="sub">Paste any link, WhatsApp chat link, payment link or text. Press Generate and your QR code is ready. No ads, no sign-up.</p>
+<div class="grid">
+<section class="card" aria-label="QR settings">
+<div class="field"><label for="txt">Link or text</label>
+<textarea id="txt" placeholder="https://wa.me/923001234567"></textarea></div>
+<div class="field"><label for="nm">Name below QR <span class="hint">(optional)</span></label>
+<input type="text" id="nm" maxlength="40" placeholder="e.g. Usama Nasir"></div>
+<div class="row field">
+<div><label for="fg">QR color</label><input type="color" id="fg" value="#12233d"></div>
+<div><label for="bg">Background</label><input type="color" id="bg" value="#ffffff"></div>
+</div>
+<div class="field"><label for="sz">Size: <span id="szv">600</span> px</label>
+<input type="range" id="sz" min="300" max="1200" step="50" value="600"></div>
+<button id="gen" type="button">Generate QR code</button>
+</section>
+<section class="card prev" aria-label="Preview">
+<div class="box" id="box"><p class="empty" id="empty">Enter your link, then press Generate. Your QR code will appear here.</p><canvas id="cv" hidden></canvas></div>
+<p class="msg" id="msg" role="status"></p>
+<button id="dl" disabled>Download PNG</button>
+</section>
+</div>
+<footer>Made by Usama. Everything runs in your browser, so your links are never uploaded.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const cv=$('cv'),ctx=cv.getContext('2d');
+let ready=false;
+function setMsg(t,bad){const m=$('msg');m.textContent=t||'';m.className='msg'+(bad?' bad':'')}
+function lum(h){const n=parseInt(h.slice(1),16),f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)};return .2126*f(n>>16&255)+.7152*f(n>>8&255)+.0722*f(n&255)}
+function draw(){
+  const text=$('txt').value.trim(),name=$('nm').value.trim(),fg=$('fg').value,bg=$('bg').value,size=+$('sz').value;
+  $('szv').textContent=size;setMsg('');ready=false;$('dl').disabled=true;
+  if(!text){cv.hidden=true;$('empty').hidden=false;return}
+  if(typeof qrcode!=='function'){setMsg('QR library could not load. Check your internet and refresh.',true);return}
+  let qr;
+  try{qr=qrcode(0,'M');qr.addData(text);qr.make()}catch(e){cv.hidden=true;$('empty').hidden=false;setMsg('This text is too long for a QR code. Please shorten it.',true);return}
+  const n=qr.getModuleCount(),pad=Math.round(size*.06),cell=Math.max(1,Math.floor((size-2*pad)/n)),qs=cell*n,W=qs+2*pad,lab=name?Math.round(W*.14):0;
+  cv.width=W;cv.height=W+lab;
+  ctx.fillStyle=bg;ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.fillStyle=fg;
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(qr.isDark(r,c))ctx.fillRect(pad+c*cell,pad+r*cell,cell,cell);
+  if(name){
+    let fs=Math.round(lab*.5);const face='system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+    ctx.font='700 '+fs+'px '+face;
+    while(ctx.measureText(name).width>W-2*pad&&fs>10){fs--;ctx.font='700 '+fs+'px '+face}
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(name,W/2,W+lab/2-pad/4);
+  }
+  cv.hidden=false;$('empty').hidden=true;ready=true;$('dl').disabled=false;
+  if(Math.abs(lum(fg)-lum(bg))<.4)setMsg('Low contrast: scanners may fail. Use a darker QR color on a lighter background.',true);
+}
+let generated=false;
+['txt','nm','fg','bg','sz'].forEach(id=>$(id).addEventListener('input',()=>{if(generated)draw();else $('szv').textContent=$('sz').value}));
+$('gen').addEventListener('click',()=>{
+  if(!$('txt').value.trim()){setMsg('Please enter a link or text first.',true);$('txt').focus();return}
+  generated=true;draw();
+});
+$('dl').addEventListener('click',()=>{
+  if(!ready)return;
+  const base=($('nm').value.trim()||'qr-code').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-')||'qr-code';
+  cv.toBlob(async blob=>{
+    if(!blob){setMsg('Could not create the image. Try again.',true);return}
+    try{
+      const d=window.claude&&await claude.use('downloads');
+      if(d){await d.save({filename:base+'.png',data:blob});setMsg('Saved.');return}
+    }catch(e){if(e&&e.code==='declined'){setMsg('');return}}
+    try{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+'.png';document.body.appendChild(a);a.click();a.remove();
+      setMsg('If nothing downloaded, press and hold the QR code and choose Save image.');
+    }catch(e){setMsg('Press and hold the QR code and choose Save image.',true)}
+  },'image/png');
+});
+draw();
+</script>
+</body>
+</html>
